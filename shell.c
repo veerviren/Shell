@@ -34,6 +34,10 @@ void parseInput(char* command, char* args[]) {
         i++;
     }
     args[i] = NULL;
+    return;
+}
+
+void accept_built_in_commands(char* args[]) {
 
     if(strcmp(args[0], "ls") == 0) {
         printf("ls command\n");
@@ -47,11 +51,8 @@ void parseInput(char* command, char* args[]) {
     else if(strcmp(args[0], "help") == 0) {
         show_help();
     }else {
-        printf("Command not found\n");
-        helper();
+        printf("Build-in Command not found\n");
     }
-
-    return;
 }
 
 int main() {
@@ -64,10 +65,12 @@ int main() {
         parseInput(command, args);
 
         int st = 0;
-        while(args[st] != NULL) {
-            printf("%s\n", args[st]);
-            st++;
-        }
+        // while(args[st] != NULL) {
+        //     printf("%s\n", args[st]);
+        //     st++;
+        // }
+
+        accept_built_in_commands(args);
     }
     return 0;
 }
