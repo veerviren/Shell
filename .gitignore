@@ -1,0 +1,12 @@
+# Object files
+*.o
+*.obj
+shell
+
+# Executables
+*.exe
+*.out
+
+# IDE specific
+.vscode/
+*.dSYM/
