@@ -41,15 +41,9 @@ void parseInput(char* command, char* args[]) {
     return;
 }
 
-void accept_built_in_commands(char* args[]) {
+bool accept_built_in_commands(char* args[]) {
 
     char *build_in_cmd[] = {"ls", "cd", "exit", "help"};
-
-    if(strcmp(args[0], "exit") == 0) {
-        printf("Exiting Viren's Shell...\n");
-        exit(0);
-        return;
-    } 
 
     bool found = false;
     for(int cmd = 0; cmd < 4; cmd++) {
@@ -61,46 +55,107 @@ void accept_built_in_commands(char* args[]) {
 
     if(!found) {
         printf("%s, is not supported Build-in Command\n", args[0]);
-        return;
+        return found;
+    }
+
+    if(strcmp(args[0], "exit") == 0) {
+        printf("Exiting Viren's Shell...\n");
+        exit(0);
+    }
+
+    if(strcmp(args[0], "cd") == 0) {
+        if(chdir(args[1]) == -1) {
+            perror("cd failed");
+        }
+        else {
+            printf("Changing directory to %s\n", args[1]);
+        }
+        return found;
+    }
+
+    if(strcmp(args[0], "help") == 0) {
+        show_help();
+        return found;
     }
 
     pid_t pid = fork();
 
     if(pid < 0) {
         perror("Fork failed");
-        return;
+        exit(1);
     }
 
     if(pid == 0) {
-        printf("Child process executing the command\n");
         if(strcmp(args[0], "ls") == 0) {
             execvp("ls", args);
-        } else if(strcmp(args[0], "cd") == 0) {
-            if(chdir(args[1]) == -1) {
-                perror("cd failed");
-            }
-        } else if(strcmp(args[0], "help") == 0) {
-            show_help();
+            perror("ls failed");
         }
-        exit(0);
+        exit(1);
     } else {
-        printf("Parent process waiting for child to complete\n");
         wait(NULL);
-        printf("Child process completed\n");
     }
+
+    return found;
+}
+
+bool accept_custom_program_commands(char* args[]) {
+
+    printf("Trying custom program execution commands..\n");
+    
+    int file_status = access(args[0], F_OK);
+    if(file_status == -1) {
+        printf("%s path not found\n", args[0]);
+        return false;
+    }
+
+    pid_t pid = fork();
+
+    if(pid < 0) {
+        perror("Fork failed");
+        exit(1);
+    }
+
+    if(pid == 0) {
+        execvp(args[0], args);
+        perror("Execution failed");
+        exit(1);
+    } else {
+        wait(NULL);
+    }
+
+    return true;
+}
+
+bool accept_io_redirection(char* args[]) {
+    return true;
 }
 
 int main() {
     printf("Welcome to Viren's Shell\n");
     helper();
     while(1) {
+        // flush the previous input
+        fflush(stdin);
+        fflush(stdout);
         printf("~~> ");
         char command[MAX];
         char* args[MAX];
         fgets(command, MAX, stdin);
         parseInput(command, args);
 
-        accept_built_in_commands(args);
+        if(accept_built_in_commands(args)) {
+            continue;
+        }
+        else if(accept_custom_program_commands(args)) {
+            continue;
+        }
+        else if(accept_io_redirection(args))
+        {
+            continue;
+        }
+        else {
+            printf("Sorry!! %s Command not supported by Viren's shell\n", args[0]);
+        }
     }
     return 0;
 }
