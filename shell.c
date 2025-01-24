@@ -4,9 +4,12 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 #define MAX 100
-#define helper() printf("If you need Guide to use Viren's Shell type 'help'\n")
+#define Welcome() printf("Welcome to Viren's Shell\n");
+#define Instruction() printf("If you need Guide to use Viren's Shell type 'help'\n")
+#define Indicator() printf("~~> ");
 
 void show_help() {
     printf("List of commands shell support\n");
@@ -41,22 +44,57 @@ void parseInput(char* command, char* args[]) {
     return;
 }
 
-bool accept_built_in_commands(char* args[]) {
+void accept_io_redirection(char* args[]) {
+    int start = 0;
 
-    char *build_in_cmd[] = {"ls", "cd", "exit", "help"};
-
-    bool found = false;
-    for(int cmd = 0; cmd < 4; cmd++) {
-        if(strcmp(args[0], build_in_cmd[cmd]) == 0) {
-            found = true;
+    while (args[start] != NULL)
+    {
+        if(strcmp(args[start], ">") == 0) {
+            args[start] = NULL;
+            int fd = open(args[start + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if(fd == -1) {
+                perror("File open failed");
+                break;
+            }
+            dup2(fd, STDOUT_FILENO);
+            close(fd);
             break;
         }
+
+        if(strcmp(args[start], "<") == 0) {
+            args[start] = NULL;
+            int fd = open(args[start + 1], O_RDONLY);
+            if(fd == -1) {
+                perror("File open failed");
+                break;
+            }
+            dup2(fd, STDIN_FILENO);
+            close(fd);
+            break;
+        }
+        start++;
+    }
+}
+
+void run_command(char* args[]) {
+    pid_t pid = fork();
+
+    if(pid < 0) {
+        perror("Fork failed");
+        exit(1);
     }
 
-    if(!found) {
-        printf("%s, is not supported Build-in Command\n", args[0]);
-        return found;
+    if(pid == 0) {
+        accept_io_redirection(args);
+        execvp(args[0], args);
+        perror("Exec failed");
+        exit(1);
+    } else {
+        wait(NULL);
     }
+}
+
+bool accept_commands(char* args[]) {
 
     if(strcmp(args[0], "exit") == 0) {
         printf("Exiting Viren's Shell...\n");
@@ -67,95 +105,32 @@ bool accept_built_in_commands(char* args[]) {
         if(chdir(args[1]) == -1) {
             perror("cd failed");
         }
-        else {
-            printf("Changing directory to %s\n", args[1]);
-        }
-        return found;
+        return true;
     }
 
     if(strcmp(args[0], "help") == 0) {
         show_help();
-        return found;
+        return true;
     }
 
-    pid_t pid = fork();
-
-    if(pid < 0) {
-        perror("Fork failed");
-        exit(1);
-    }
-
-    if(pid == 0) {
-        if(strcmp(args[0], "ls") == 0) {
-            execvp("ls", args);
-            perror("ls failed");
-        }
-        exit(1);
-    } else {
-        wait(NULL);
-    }
-
-    return found;
-}
-
-bool accept_custom_program_commands(char* args[]) {
-
-    printf("Trying custom program execution commands..\n");
-    
-    int file_status = access(args[0], F_OK);
-    if(file_status == -1) {
-        printf("%s path not found\n", args[0]);
-        return false;
-    }
-
-    pid_t pid = fork();
-
-    if(pid < 0) {
-        perror("Fork failed");
-        exit(1);
-    }
-
-    if(pid == 0) {
-        execvp(args[0], args);
-        perror("Execution failed");
-        exit(1);
-    } else {
-        wait(NULL);
-    }
-
-    return true;
-}
-
-bool accept_io_redirection(char* args[]) {
+    run_command(args);
     return true;
 }
 
 int main() {
-    printf("Welcome to Viren's Shell\n");
-    helper();
+    Welcome();
+    Instruction();
     while(1) {
-        // flush the previous input
         fflush(stdin);
         fflush(stdout);
-        printf("~~> ");
+        Indicator();
         char command[MAX];
         char* args[MAX];
+        
         fgets(command, MAX, stdin);
-        parseInput(command, args);
 
-        if(accept_built_in_commands(args)) {
-            continue;
-        }
-        else if(accept_custom_program_commands(args)) {
-            continue;
-        }
-        else if(accept_io_redirection(args))
-        {
-            continue;
-        }
-        else {
-            printf("Sorry!! %s Command not supported by Viren's shell\n", args[0]);
-        }
+        parseInput(command, args);
+        accept_commands(args);
     }
     return 0;
 }
