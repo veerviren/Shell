@@ -32,44 +32,46 @@ void format(char* str) {
 
 void parseInput(char* command, char* args[]) {
     
-    char* token = strtok(command, " ");
+    char* chunk = strtok(command, " ");
     int i = 0;
-    while(token != NULL) {
-        format(token);
-        args[i] = token;
-        token = strtok(NULL, " ");
+    while(chunk != NULL) {
+        format(chunk);
+        args[i] = chunk;
+        chunk = strtok(NULL, " ");
         i++;
     }
     args[i] = NULL;
     return;
 }
 
+int perform_redirection(const char* filename, int flags, int target_fd) {
+    int fd = open(filename, flags, 0644);
+    if(fd == -1) {
+        perror("File open failed");
+        return -1;
+    }
+    if(dup2(fd, target_fd) == -1) {
+        perror("Redirection failed");
+        close(fd);
+        return -1;
+    }
+    close(fd);
+    return 0;
+}
+
 void accept_io_redirection(char* args[]) {
     int start = 0;
-
-    while (args[start] != NULL)
-    {
+    while (args[start] != NULL) {
         if(strcmp(args[start], ">") == 0) {
             args[start] = NULL;
-            int fd = open(args[start + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            if(fd == -1) {
-                perror("File open failed");
+            if(perform_redirection(args[start + 1], O_WRONLY | O_CREAT | O_TRUNC, STDOUT_FILENO) == -1)
                 break;
-            }
-            dup2(fd, STDOUT_FILENO);
-            close(fd);
             break;
         }
-
         if(strcmp(args[start], "<") == 0) {
             args[start] = NULL;
-            int fd = open(args[start + 1], O_RDONLY);
-            if(fd == -1) {
-                perror("File open failed");
+            if(perform_redirection(args[start + 1], O_RDONLY, STDIN_FILENO) == -1)
                 break;
-            }
-            dup2(fd, STDIN_FILENO);
-            close(fd);
             break;
         }
         start++;
@@ -90,6 +92,8 @@ void run_command(char* args[]) {
         perror("Exec failed");
         exit(1);
     } else {
+        // uncomment below line to see the child process in the pstree
+        // sleep(40); 
         wait(NULL);
     }
 }
